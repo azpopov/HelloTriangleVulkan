@@ -1,6 +1,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include "..\..\glfw-3.2.1.bin.WIN64\include\GLFW\glfw3.h"
-//#include "..\..\glfw-3.2.1.bin.WIN64\include\GLFW\glfw3native.h"
+#include "..\..\glfw-3.2.1.bin.WIN64\include\GLFW\glfw3native.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -25,6 +25,7 @@ private:
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
 	void initWindow() {
+		glfwInit();
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Hello Triangle", nullptr, nullptr);
@@ -35,11 +36,15 @@ private:
 	}
 
 	void mainLoop() {
-
+		while (!glfwWindowShouldClose(window))
+		{
+			glfwPollEvents();
+		}
 	}
 
 	void cleanup() {
-
+		glfwDestroyWindow(window);
+		glfwTerminate();
 	}
 };
 
