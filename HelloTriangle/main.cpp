@@ -59,14 +59,36 @@ private:
 			throw std::runtime_error("failed to create instance!");
 		}
 
+		VerifyGLFWRequiredExtensionsPresent(glfwExtensions, glfwExtensionCount);
+	}
+
+	bool VerifyGLFWRequiredExtensionsPresent(const char* const* glfwRequiredExtensions, uint32_t glfwExtensionCount)
+	{	
+		bool result = 1;
 		uint32_t extensionCount = 0;
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-		VkExtensionProperties extensions[13];
-		VkResult extensionResult = vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions);
-		for (const auto& extension : extensions)
+		std::vector<VkExtensionProperties> extensions(13);
+		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+		bool extensionFound = true;
+		for(auto i = 0; i < glfwExtensionCount; i++)
 		{
-			std::cout << "\t" <<extension.extensionName << std::endl;
-		}
+			extensionFound = false;
+			for (const auto& extension : extensions)
+			{
+				std::string supportedExtensionName(extension.extensionName);
+				std::string requiredExtensionName(glfwRequiredExtensions[i]);
+				if (supportedExtensionName == requiredExtensionName) {
+					extensionFound = true;
+					continue;
+				}
+			}
+			if (extensionFound == false)
+			{
+				result = 0;
+				break;
+			}
+		};
+		return result;
 	}
 
 	void initVulkan() {
