@@ -26,6 +26,20 @@ private:
 	GLFWwindow * window;
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
+
+	const std::vector<const char *> validationLayers = {
+		"VK_LAYER_LUNARG_standard_validation"
+	};
+
+#ifdef NDEBUG
+	const bool enableValidationLayers = false;
+
+#else
+	const bool enableValidationLayers = true;
+#endif // NDEBUG
+
+
+
 	void initWindow() {
 		glfwInit();
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -34,6 +48,10 @@ private:
 	}
 
 	void createInstance() {
+		if (enableValidationLayers && !allValidationLayersArePresent()) {
+			throw std::runtime_error("Missing support for requested validation Layers.");
+		}
+
 		VkApplicationInfo applicationInfo = {};
 		applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		applicationInfo.pApplicationName = "Hello Triangle";
@@ -53,7 +71,14 @@ private:
 		createInfo.enabledExtensionCount = glfwExtensionCount;
 		createInfo.ppEnabledExtensionNames = glfwExtensions;
 
-		createInfo.enabledLayerCount = 0;
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
+		
 
 		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create instance!");
@@ -88,6 +113,26 @@ private:
 				break;
 			}
 		};
+		return result;
+	}
+
+	bool allValidationLayersArePresent() {
+		bool result = true;
+		uint32_t supportedLayerCount;
+		vkEnumerateInstanceLayerProperties(&supportedLayerCount, nullptr);
+		std::vector<VkLayerProperties> availableLayers(supportedLayerCount);
+		vkEnumerateInstanceLayerProperties(&supportedLayerCount, availableLayers.data());
+		for (const char * layerName : validationLayers) {
+			bool layerIsPresent = false;
+			for (const auto& availableLayer : availableLayers) {
+				if (strcmp(availableLayer.layerName, layerName) == 0) {
+					layerIsPresent = true;
+				}
+			}
+			if (!layerIsPresent) {
+				result = false;
+			}
+		}
 		return result;
 	}
 
