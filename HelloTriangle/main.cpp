@@ -12,6 +12,21 @@
 #include <iostream>
 #include <vector>
 
+VkResult CreateDebugReportCallbackEXT(VkInstance instance,
+	const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
+	const VkAllocationCallbacks * pAllocator, VkDebugReportCallbackEXT* pCallback)
+{
+	auto func = PFN_vkCreateDebugReportCallbackEXT(vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT"));
+	if(func != nullptr)
+	{
+		return func(instance, pCreateInfo, pAllocator, pCallback);
+	}
+	else
+	{
+		return VK_ERROR_EXTENSION_NOT_PRESENT;
+	}
+}
+
 class HelloTriangleApplication {
 public:
 	void run() {
@@ -23,6 +38,7 @@ public:
 
 private:
 	VkInstance instance;
+	VkDebugReportCallbackEXT callback;
 	GLFWwindow * window;
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
@@ -64,12 +80,10 @@ private:
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &applicationInfo;
 
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		auto extensions = get_required_extensions();
 
-		createInfo.enabledExtensionCount = glfwExtensionCount;
-		createInfo.ppEnabledExtensionNames = glfwExtensions;
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		createInfo.ppEnabledExtensionNames = extensions.data();
 
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -84,7 +98,35 @@ private:
 			throw std::runtime_error("failed to create instance!");
 		}
 
-		VerifyGLFWRequiredExtensionsPresent(glfwExtensions, glfwExtensionCount);
+		
+	}
+
+	std::vector<const char *> get_required_extensions()
+	{
+		uint32_t extensionCount = 0;
+		const char ** glfwExtensions = glfwGetRequiredInstanceExtensions(&extensionCount);
+		std::vector<const char *> extensions(glfwExtensions, glfwExtensions + extensionCount);
+		if(enableValidationLayers)
+		{
+			extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		}
+		return extensions;
+	}
+
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+	
+		VkDebugReportFlagsEXT flags,
+		VkDebugReportObjectTypeEXT objType,
+		uint64_t obj,
+		size_t location,
+		int32_t code,
+		const char * layerPrefix,
+		const char * msg,
+		void* userData
+		)
+	{
+		std::cerr << "validation layers: " << msg << std::endl;
+		return VK_FALSE;
 	}
 
 	bool VerifyGLFWRequiredExtensionsPresent(const char* const* glfwRequiredExtensions, uint32_t glfwExtensionCount)
@@ -134,6 +176,15 @@ private:
 			}
 		}
 		return result;
+	}
+
+	void setupDebugCallback()
+	{
+		if (!enableValidationLayers) return;
+		VkDebugReportCallbackCreateInfoEXT createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
+		createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+		createInfo.pfnCallback = debugCallback;
 	}
 
 	void initVulkan() {
