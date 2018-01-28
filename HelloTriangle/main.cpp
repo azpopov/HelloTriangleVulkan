@@ -49,8 +49,11 @@ public:
 
 private:
 	VkInstance instance;
+	VkDevice device;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDebugReportCallbackEXT callback;
 	GLFWwindow * window;
+	VkQueue graphicsQueue;
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
 
@@ -238,7 +241,7 @@ private:
 
 	void pickPhysicalDevice()
 	{
-		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+		
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -279,10 +282,47 @@ private:
 			&& deviceFeatures.geometryShader && isIndiceComplete;
 	}
 
+	void createLogicalDevice()
+	{
+		QueueFamiliesIndices indices = findQueueFamilies(physicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
+		queueCreateInfo.queueCount = 1;
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures = {};
+
+		VkDeviceCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		createInfo.enabledExtensionCount = 0;
+		if(enableValidationLayers)
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else
+		{
+			createInfo.enabledLayerCount = 0;
+		}
+		if(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to create logical device!");
+		}
+		vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+	}
+
 	void initVulkan() {
 		createInstance();
 		setupDebugCallback();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void mainLoop() {
@@ -296,7 +336,7 @@ private:
 		DestroyDebugReportCallbackEXT(instance, callback, nullptr);
 
 		vkDestroyInstance(instance, nullptr);
-
+		vkDestroyDevice(device, nullptr);
 		glfwDestroyWindow(window);
 		glfwTerminate();
 	}
