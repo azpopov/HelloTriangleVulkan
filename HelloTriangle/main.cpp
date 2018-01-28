@@ -65,7 +65,15 @@ private:
 	const bool enableValidationLayers = true;
 #endif // NDEBUG
 
+	struct QueueFamiliesIndices
+	{
+		int graphicsFamily = -1;
 
+		bool isComplete()
+		{
+			return graphicsFamily >= 0;
+		}
+	};
 
 	void initWindow() {
 		glfwInit();
@@ -78,7 +86,6 @@ private:
 		if (enableValidationLayers && !allValidationLayersArePresent()) {
 			throw std::runtime_error("Missing support for requested validation Layers.");
 		}
-
 		VkApplicationInfo applicationInfo = {};
 		applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		applicationInfo.pApplicationName = "Hello Triangle";
@@ -108,11 +115,33 @@ private:
 		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create instance!");
 		}
-
 		
+	}
 
+	QueueFamiliesIndices findQueueFamilies(VkPhysicalDevice device)
+	{
+		QueueFamiliesIndices indices;
 
-		
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		int i = 0;
+		for(const auto& queueFamily : queueFamilies)
+		{
+			if(queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				indices.graphicsFamily = i;
+			}
+			if(indices.isComplete())
+			{
+				break;
+			}
+			i++;
+		}
+		return indices;
 	}
 
 	std::vector<const char *> get_required_extensions()
@@ -242,8 +271,12 @@ private:
 		VkPhysicalDeviceFeatures deviceFeatures;
 		vkGetPhysicalDeviceProperties(device, &deviceProperties);
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+		QueueFamiliesIndices indices = findQueueFamilies(device);
+
+		const auto isIndiceComplete = indices.isComplete();
 		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU 
-			&& deviceFeatures.geometryShader;
+			&& deviceFeatures.geometryShader && isIndiceComplete;
 	}
 
 	void initVulkan() {
