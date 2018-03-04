@@ -354,3 +354,6 @@ ASALocalRun/
 
 # MSBuild Binary and Structured Log
 *.binlog
+
+*.bat
+*.spv
