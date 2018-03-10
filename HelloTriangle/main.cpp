@@ -68,6 +68,9 @@ private:
 	VkPipelineLayout pipelineLayout;
 	VkDebugReportCallbackEXT callback;
 	VkPipeline graphicsPipeline;
+	std::vector<VkFramebuffer> swapChainFrameBuffers;
+	VkCommandPool commandPool;
+	std::vector<VkCommandBuffer> commandBuffers;
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
 
@@ -748,6 +751,93 @@ private:
 		}
 	};
 
+	void createFramebuffers()
+	{
+		swapChainFrameBuffers.resize(swapChainImageViews.size());
+		for(size_t i = 0; i < swapChainFrameBuffers.size(); i++)
+		{
+			VkImageView attachments[] = {
+				swapChainImageViews[i]
+			};
+			VkFramebufferCreateInfo framebufferInfo = {};
+			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			framebufferInfo.renderPass = renderPass;
+			framebufferInfo.attachmentCount = 1;
+			framebufferInfo.pAttachments = attachments;
+			framebufferInfo.width = swapChainExtent.width;
+			framebufferInfo.height = swapChainExtent.height;
+			framebufferInfo.layers = 1;
+
+			if(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFrameBuffers[i]))
+			{
+				throw std::runtime_error("failed to create framebuffer!");
+			}
+		}
+	};
+
+	void createCommandPools()
+	{
+		QueueFamiliesIndices queueFamiliesIndices = findQueueFamilies(physicalDevice);
+		VkCommandPoolCreateInfo poolCreateInfo = {};
+		poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolCreateInfo.queueFamilyIndex = queueFamiliesIndices.graphicsFamily;
+		poolCreateInfo.flags = 0;
+
+		if(vkCreateCommandPool(device, &poolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create command pool!");
+		}
+	};
+
+	void createCommandBuffers()
+	{
+		commandBuffers.resize(swapChainFrameBuffers.size());
+		VkCommandBufferAllocateInfo allocateInfo = {};
+		allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocateInfo.commandPool = commandPool;
+		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocateInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+		if(vkAllocateCommandBuffers(device, nullptr, commandBuffers.data()) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to allocate command buffers!");
+		}
+
+		for(size_t i = 0; i < commandBuffers.size(); i++)
+		{
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+			beginInfo.pInheritanceInfo = nullptr;
+
+			vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
+
+			VkRenderPassBeginInfo renderPassInfo = {};
+			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass = renderPass;
+			renderPassInfo.framebuffer = swapChainFrameBuffers[i];
+			renderPassInfo.renderArea.offset = { 0,0 };
+			renderPassInfo.renderArea.extent = swapChainExtent;
+
+			VkClearValue clearColor = { 0.f, 0.f, 0.f, 1.f };
+			renderPassInfo.pClearValues = &clearColor;
+			renderPassInfo.clearValueCount = 1;
+
+			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+			vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
+			vkCmdEndRenderPass(commandBuffers[i]);
+
+			if(vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
+			{
+				throw std::runtime_error("failed to record command buffer!");
+			}
+		}
+
+	};
+
 	void initVulkan() {
 		createInstance();
 		setupDebugCallback();
@@ -758,6 +848,9 @@ private:
 		createImageViews();
 		createRenderPass();
 		createGraphicsPipeline();
+		createFramebuffers();
+		createCommandPools();
+		createCommandBuffers();
 	}
 
 	void mainLoop() {
@@ -768,12 +861,17 @@ private:
 	}
 
 	void cleanup() {
+		vkDestroyCommandPool(device, commandPool, nullptr);
 		DestroyDebugReportCallbackEXT(instance, callback, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
 		vkDestroySwapchainKHR(device, swapChain, nullptr);
+		for(auto i = 0; i < swapChainFrameBuffers.size(); i++)
+		{
+			vkDestroyFramebuffer(device, swapChainFrameBuffers[i], nullptr);
+		}
 		for(auto imageView : swapChainImageViews)
 		{
 			vkDestroyImageView(device, imageView, nullptr);
